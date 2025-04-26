@@ -92,18 +92,19 @@ export default function Home() {
     // Redirect to login if not authenticated
     if (!isLoading && !user) {
       router.push("/login")
+      return
     }
-  }, [user, isLoading, router])
 
-  useEffect(() => {
-    // Load nodes from local storage or use example nodes if none exist
-    const storedNodes = loadNodes()
-    setNodes(storedNodes.length > 0 ? storedNodes : exampleNodes)
+    // Load user's nodes
+    if (user) {
+      const storedNodes = loadNodes(user.id)
+      setNodes(storedNodes.length > 0 ? storedNodes : [])
+    }
 
-    // Load notifications or use example notifications if none exist
+    // Load notifications
     const storedNotifications = loadNotifications()
     if (storedNotifications.length === 0) {
-      saveNotifications(exampleNotifications)
+      saveNotifications([])
     }
 
     // Fetch dashboard stats
@@ -113,7 +114,9 @@ export default function Home() {
     }
 
     fetchStats()
+  }, [user, isLoading, router])
 
+  useEffect(() => {
     // Close user menu when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
       if (showUserMenu) {
@@ -128,6 +131,8 @@ export default function Home() {
   }, [showUserMenu])
 
   const handleStatusChange = (node: Node, previousStatus: string) => {
+    if (!user) return
+
     // Create a notification when node status changes
     const statusText = node.status === "active" ? "running" : node.status === "inactive" ? "offline" : "unknown"
     const notification: Notification = {
@@ -142,6 +147,7 @@ export default function Home() {
   }
 
   const handleRefresh = async () => {
+    if (!user) return
     setIsRefreshing(true)
 
     try {
@@ -164,18 +170,17 @@ export default function Home() {
             return updatedNode
           } catch (error) {
             console.error(`Error updating node ${node.peerName}:`, error)
-            // API hata verdiğinde mevcut durumu koruyoruz
             return {
               ...node,
-              status: node.status, // Mevcut durumu koruyoruz
+              status: node.status,
               lastUpdated: Date.now(),
             }
           }
-        }),
+        })
       )
 
       setNodes(updatedNodes)
-      saveNodes(updatedNodes)
+      saveNodes(updatedNodes, user.id)
     } catch (error) {
       console.error("Error refreshing data:", error)
     } finally {

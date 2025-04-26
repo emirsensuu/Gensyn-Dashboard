@@ -3,12 +3,13 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
 import { registerUser, verifyCredentials, type StoredUser } from "./users"
+import { clearUserStorage } from "./storage"
 
 interface AuthContextType {
   user: StoredUser | null
   login: (email: string, password: string) => Promise<void>
   register: (username: string, email: string, password: string) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   isLoading: boolean
 }
 
@@ -124,14 +125,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const logout = () => {
-    // Clear all user-related data
-    localStorage.removeItem("gensyn-session")
-    localStorage.removeItem("gensyn-users")
-    localStorage.removeItem("gensyn-nodes")
-    localStorage.removeItem("gensyn-notifications")
-    setUser(null)
-    router.push("/login")
+  const logout = async () => {
+    try {
+      if (user) {
+        // Clear all user data
+        clearUserStorage(user.id)
+      }
+      setUser(null)
+      await router.push("/login")
+    } catch (error) {
+      console.error("Logout failed:", error)
+    }
   }
 
   return (

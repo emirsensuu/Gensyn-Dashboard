@@ -5,7 +5,7 @@ import { useState } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { addNodeToUser } from "@/lib/users"
 import type { Node } from "@/lib/types"
-import { saveNodes } from "@/lib/storage"
+import { saveNodes, loadNodes } from "@/lib/storage"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,15 +13,6 @@ import { Label } from "@/components/ui/label"
 interface AddNodeFormProps {
   nodes: Node[]
   setNodes: (nodes: Node[]) => void
-}
-
-// User nodes are stored in localStorage with this key pattern: user_{userId}_nodes
-const USER_NODES_KEY_PREFIX = "user_"
-
-const getUserNodes = (userId: string): string[] => {
-  const key = `${USER_NODES_KEY_PREFIX}${userId}_nodes`
-  const storedNodes = localStorage.getItem(key)
-  return storedNodes ? JSON.parse(storedNodes) : []
 }
 
 export function AddNodeForm({ nodes, setNodes }: AddNodeFormProps) {
@@ -50,13 +41,16 @@ export function AddNodeForm({ nodes, setNodes }: AddNodeFormProps) {
       const normalizedPeerName = peerName.trim().toUpperCase()
       console.log(`Adding node: ${normalizedPeerName}`)
 
-      // Check if node already exists in the nodes array
-      const existingNode = nodes.find(node => 
+      // Load user's nodes
+      const userNodes = loadNodes(user.id)
+
+      // Check if node already exists for this user
+      const existingNode = userNodes.find(node => 
         node.peerName.toUpperCase() === normalizedPeerName
       )
 
       if (existingNode) {
-        setError("This node has already been added")
+        setError("You have already added this node")
         setIsLoading(false)
         return
       }
@@ -79,10 +73,10 @@ export function AddNodeForm({ nodes, setNodes }: AddNodeFormProps) {
       // Add node to user's nodes
       addNodeToUser(user.id, newNode.id)
 
-      // Update nodes state with the new node
-      const updatedNodes = [...nodes, newNode]
+      // Update nodes state and storage
+      const updatedNodes = [...userNodes, newNode]
       setNodes(updatedNodes)
-      saveNodes(updatedNodes)
+      saveNodes(updatedNodes, user.id)
       setPeerName("")
     } catch (error) {
       console.error("Error adding node:", error)

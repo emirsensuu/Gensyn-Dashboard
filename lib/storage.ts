@@ -4,17 +4,19 @@ import type { Node, Notification } from "./types"
 const NODES_STORAGE_KEY = "gensyn-nodes"
 const NOTIFICATIONS_STORAGE_KEY = "gensyn-notifications"
 
-// Save nodes to local storage
-export function saveNodes(nodes: Node[]): void {
+// Save nodes to local storage for specific user
+export function saveNodes(nodes: Node[], userId: string): void {
   if (typeof window !== "undefined") {
-    localStorage.setItem(NODES_STORAGE_KEY, JSON.stringify(nodes))
+    const key = `${NODES_STORAGE_KEY}_${userId}`
+    localStorage.setItem(key, JSON.stringify(nodes))
   }
 }
 
-// Load nodes from local storage
-export function loadNodes(): Node[] {
+// Load nodes from local storage for specific user
+export function loadNodes(userId: string): Node[] {
   if (typeof window !== "undefined") {
-    const storedNodes = localStorage.getItem(NODES_STORAGE_KEY)
+    const key = `${NODES_STORAGE_KEY}_${userId}`
+    const storedNodes = localStorage.getItem(key)
     return storedNodes ? JSON.parse(storedNodes) : []
   }
   return []
@@ -49,16 +51,18 @@ export function markNotificationAsRead(notificationId: string): void {
 
 // Add a new notification
 export function addNotification(notification: Notification): void {
-  if (typeof window !== "undefined") {
-    const notifications = loadNotifications()
-    saveNotifications([notification, ...notifications])
-  }
+  const notifications = loadNotifications()
+  notifications.push(notification)
+  saveNotifications(notifications)
 }
 
-// Clear all notifications
-export function clearNotifications(): void {
+// Clear all storage for a user
+export function clearUserStorage(userId: string): void {
   if (typeof window !== "undefined") {
-    saveNotifications([])
+    localStorage.removeItem(`${NODES_STORAGE_KEY}_${userId}`)
+    localStorage.removeItem(NOTIFICATIONS_STORAGE_KEY)
+    localStorage.removeItem("gensyn-session")
+    localStorage.removeItem("gensyn-users")
   }
 }
 
