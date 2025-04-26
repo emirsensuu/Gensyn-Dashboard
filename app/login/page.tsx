@@ -8,8 +8,8 @@ import { useAuth } from "@/lib/auth-context"
 
 export default function LoginPage() {
   const { login } = useAuth()
-  const [email, setEmail] = useState("node@example.com")
-  const [password, setPassword] = useState("password123")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
@@ -26,7 +26,11 @@ export default function LoginPage() {
     try {
       await login(email, password)
     } catch (err) {
-      setError("Login failed. Please check your credentials.")
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError("Login failed. Please check your credentials.")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -43,7 +47,6 @@ export default function LoginPage() {
           <div className="mb-6">
             <h2 className="text-xl font-normal text-center">LOGIN</h2>
             <p className="mt-2 text-sm text-center">Welcome back to Gensyn Testnet</p>
-            <p className="mt-2 text-xs text-center text-gensyn-text/70">Test account: node@example.com / password123</p>
           </div>
 
           <form className="space-y-6" onSubmit={handleSubmit}>
@@ -58,6 +61,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full p-2 border border-gensyn-text bg-gensyn-muted/30 focus:outline-none"
+                required
               />
             </div>
 
@@ -72,6 +76,8 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full p-2 border border-gensyn-text bg-gensyn-muted/30 focus:outline-none"
+                required
+                minLength={6}
               />
             </div>
 

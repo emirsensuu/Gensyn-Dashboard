@@ -29,11 +29,20 @@ export default function RegisterPage() {
       return
     }
 
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long")
+      return
+    }
+
     setIsLoading(true)
     try {
       await register(username, email, password)
     } catch (err) {
-      setError("Registration failed. Please try again.")
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError("Registration failed. Please try again.")
+      }
     } finally {
       setIsLoading(false)
     }
@@ -64,6 +73,8 @@ export default function RegisterPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full p-2 border border-gensyn-text bg-gensyn-muted/30 focus:outline-none"
+                required
+                minLength={3}
               />
             </div>
 
@@ -78,6 +89,7 @@ export default function RegisterPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full p-2 border border-gensyn-text bg-gensyn-muted/30 focus:outline-none"
+                required
               />
             </div>
 
@@ -92,6 +104,8 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full p-2 border border-gensyn-text bg-gensyn-muted/30 focus:outline-none"
+                required
+                minLength={6}
               />
             </div>
 
@@ -106,6 +120,8 @@ export default function RegisterPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full p-2 border border-gensyn-text bg-gensyn-muted/30 focus:outline-none"
+                required
+                minLength={6}
               />
             </div>
 

@@ -2,14 +2,10 @@
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 import { useRouter } from "next/navigation"
-
-interface User {
-  username?: string
-  email: string
-}
+import { registerUser, verifyCredentials, type StoredUser } from "./users"
 
 interface AuthContextType {
-  user: User | null
+  user: StoredUser | null
   login: (email: string, password: string) => Promise<void>
   register: (username: string, email: string, password: string) => Promise<void>
   logout: () => void
@@ -18,45 +14,74 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
-// Test user
-const TEST_USER = {
-  email: "node@example.com",
-  password: "password123",
+// Validate email format
+const isValidEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+// Validate password strength
+const isValidPassword = (password: string): boolean => {
+  return password.length >= 6
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<StoredUser | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
   useEffect(() => {
     // Check if user is logged in on initial load
-    const storedUser = localStorage.getItem("gensyn-user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
+    const checkAuth = () => {
+      try {
+        const session = localStorage.getItem("gensyn-session")
+        if (session) {
+          const userData = JSON.parse(session)
+          setUser(userData)
+        }
+      } catch (error) {
+        console.error("Invalid session data:", error)
+        localStorage.removeItem("gensyn-session")
+      }
+      setIsLoading(false)
     }
-    setIsLoading(false)
+
+    checkAuth()
   }, [])
+
+  useEffect(() => {
+    // Redirect logic
+    if (!isLoading) {
+      const pathname = window.location.pathname
+      const isAuthRoute = pathname === "/login" || pathname === "/register"
+
+      if (!user && !isAuthRoute) {
+        router.push("/login")
+      } else if (user && isAuthRoute) {
+        router.push("/")
+      }
+    }
+  }, [user, isLoading, router])
 
   const login = async (email: string, password: string) => {
     setIsLoading(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      // Check if it's our test user
-      if (email === TEST_USER.email && password === TEST_USER.password) {
-        const user = { email }
-        localStorage.setItem("gensyn-user", JSON.stringify(user))
-        setUser(user)
-        router.push("/")
-        return
+      // Validate email format
+      if (!isValidEmail(email)) {
+        throw new Error("Invalid email format")
       }
 
-      // In a real app, you would validate credentials with an API
-      const user = { email }
-      localStorage.setItem("gensyn-user", JSON.stringify(user))
-      setUser(user)
+      // Validate password
+      if (!isValidPassword(password)) {
+        throw new Error("Password must be at least 6 characters long")
+      }
+
+      // Verify credentials
+      const userData = verifyCredentials(email, password)
+      
+      // Store session
+      localStorage.setItem("gensyn-session", JSON.stringify(userData))
+      setUser(userData)
       router.push("/")
     } catch (error) {
       console.error("Login failed:", error)
@@ -69,13 +94,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (username: string, email: string, password: string) => {
     setIsLoading(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      // Validate email format
+      if (!isValidEmail(email)) {
+        throw new Error("Invalid email format")
+      }
 
-      // In a real app, you would register the user with an API
-      const user = { username, email }
-      localStorage.setItem("gensyn-user", JSON.stringify(user))
-      setUser(user)
+      // Validate password
+      if (!isValidPassword(password)) {
+        throw new Error("Password must be at least 6 characters long")
+      }
+
+      // Validate username
+      if (!username || username.length < 3) {
+        throw new Error("Username must be at least 3 characters long")
+      }
+
+      // Register new user
+      const userData = registerUser(username, email, password)
+      
+      // Store session
+      localStorage.setItem("gensyn-session", JSON.stringify(userData))
+      setUser(userData)
       router.push("/")
     } catch (error) {
       console.error("Registration failed:", error)
@@ -86,12 +125,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = () => {
-    localStorage.removeItem("gensyn-user")
+    // Clear all user-related data
+    localStorage.removeItem("gensyn-session")
+    localStorage.removeItem("gensyn-users")
+    localStorage.removeItem("gensyn-nodes")
+    localStorage.removeItem("gensyn-notifications")
     setUser(null)
     router.push("/login")
   }
 
-  return <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Settings, Copy, Check, Trash2 } from "lucide-react"
 import type { Node } from "@/lib/types"
 import { saveNodes } from "@/lib/storage"
+import { useAuth } from "@/lib/auth-context"
+import { getUserNodes } from "@/lib/users"
 
 interface NodeTableProps {
   nodes: Node[]
@@ -14,10 +16,18 @@ interface NodeTableProps {
 }
 
 export function NodeTable({ nodes, setNodes, onStatusChange, onRefresh, isRefreshing }: NodeTableProps) {
+  const { user } = useAuth()
   const [activeFilter, setActiveFilter] = useState<string>("all")
   const [copiedText, setCopiedText] = useState<string | null>(null)
 
-  const filteredNodes = nodes.filter((node) => {
+  // Filter nodes to only show user's nodes
+  const userNodes = nodes.filter((node) => {
+    if (!user) return false
+    const userNodeIds = getUserNodes(user.id)
+    return userNodeIds.includes(node.id)
+  })
+
+  const filteredNodes = userNodes.filter((node) => {
     if (activeFilter === "all") return true
     if (activeFilter === "active") return node.status === "active"
     if (activeFilter === "inactive") return node.status === "inactive"

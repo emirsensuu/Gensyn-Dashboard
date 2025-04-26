@@ -1,18 +1,31 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
-import { getPeerData } from "@/lib/api"
+import { useAuth } from "@/lib/auth-context"
+import { addNodeToUser } from "@/lib/users"
 import type { Node } from "@/lib/types"
 import { saveNodes } from "@/lib/storage"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 interface AddNodeFormProps {
   nodes: Node[]
   setNodes: (nodes: Node[]) => void
 }
 
+// User nodes are stored in localStorage with this key pattern: user_{userId}_nodes
+const USER_NODES_KEY_PREFIX = "user_"
+
+const getUserNodes = (userId: string): string[] => {
+  const key = `${USER_NODES_KEY_PREFIX}${userId}_nodes`
+  const storedNodes = localStorage.getItem(key)
+  return storedNodes ? JSON.parse(storedNodes) : []
+}
+
 export function AddNodeForm({ nodes, setNodes }: AddNodeFormProps) {
+  const { user } = useAuth()
   const [peerName, setPeerName] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -20,17 +33,13 @@ export function AddNodeForm({ nodes, setNodes }: AddNodeFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!peerName.trim()) {
-      setError("Please enter a peer name")
+    if (!user) {
+      setError("You must be logged in to add nodes")
       return
     }
 
-    // Peer name'i normalize edelim
-    const normalizedPeerName = peerName.trim().toUpperCase()
-
-    // Check if node already exists
-    if (nodes.some((node) => node.peerName.toUpperCase() === normalizedPeerName)) {
-      setError("This node is already added")
+    if (!peerName.trim()) {
+      setError("Please enter a peer name")
       return
     }
 
@@ -38,15 +47,40 @@ export function AddNodeForm({ nodes, setNodes }: AddNodeFormProps) {
     setError(null)
 
     try {
+      const normalizedPeerName = peerName.trim().toUpperCase()
       console.log(`Adding node: ${normalizedPeerName}`)
-      const nodeData = await getPeerData(normalizedPeerName)
 
-      if (!nodeData) {
-        setError("Failed to fetch node data. Please try again.")
+      // Check if node already exists in the nodes array
+      const existingNode = nodes.find(node => 
+        node.peerName.toUpperCase() === normalizedPeerName
+      )
+
+      if (existingNode) {
+        setError("This node has already been added")
+        setIsLoading(false)
         return
       }
 
-      const updatedNodes = [...nodes, nodeData]
+      const response = await fetch(`/api/peer?name=${encodeURIComponent(normalizedPeerName)}`)
+      const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || "Failed to fetch node data")
+        return
+      }
+
+      // Create new node with unique ID
+      const newNode: Node = {
+        ...data,
+        id: `node_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        peerName: normalizedPeerName,
+      }
+
+      // Add node to user's nodes
+      addNodeToUser(user.id, newNode.id)
+
+      // Update nodes state with the new node
+      const updatedNodes = [...nodes, newNode]
       setNodes(updatedNodes)
       saveNodes(updatedNodes)
       setPeerName("")
@@ -74,7 +108,7 @@ export function AddNodeForm({ nodes, setNodes }: AddNodeFormProps) {
       <button
         type="submit"
         disabled={isLoading}
-        className="bg-[#E8CDC7] hover:bg-[#DEC2BC] px-4 py-2 border border-gensyn-text border-l-0"
+        className="bg-[#806760] px-4 py-2 border border-gensyn-text border-l-0"
       >
         {isLoading ? "SEARCHING..." : "SEARCH"}
       </button>
